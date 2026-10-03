@@ -15,10 +15,11 @@ const { useMongoAuthState, SessionModel } = require('./auth');
 const app = express();
 app.use(express.json());
 
-// MongoDB Connection URL
+// Bot Settings & MongoDB Config
 const MONGO_URL = process.env.MONGODB_URL || "mongodb+srv://heshanxmd43_db_user:FEMEM3yjl69L0SuF@cluster0.b6nhi22.mongodb.net/?appName=Cluster0";
 const PORT = process.env.PORT || 3000;
 const BOT_TAG = "DARK-DINU";
+const PREFIX = ".";
 
 // Active Bot sockets Map
 const activeBots = new Map();
@@ -39,6 +40,7 @@ async function startSingleBot(sessionId, phoneNumber = null, res = null) {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
+            generateHighQualityLinkPreview: true,
             syncFullHistory: false
         });
 
@@ -69,23 +71,23 @@ async function startSingleBot(sessionId, phoneNumber = null, res = null) {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-                console.log(chalk.red(`[${BOT_TAG}] [${sessionId}] Disconnected. Code: ${statusCode}`));
+                console.log(chalk.red(`[${BOT_TAG}] [${sessionId}] Disconnected. Reason: ${statusCode}`));
 
                 if (shouldReconnect) {
-                    console.log(chalk.yellow(`[${BOT_TAG}] [${sessionId}] Reconnecting...`));
+                    console.log(chalk.yellow(`[${BOT_TAG}] [${sessionId}] Reconnecting in 5s...`));
                     setTimeout(() => startSingleBot(sessionId), 5000);
                 } else {
-                    console.log(chalk.red(`[${BOT_TAG}] [${sessionId}] Logged out. Clearing data...`));
+                    console.log(chalk.red(`[${BOT_TAG}] [${sessionId}] Logged out. Clearing session...`));
                     await clearSession();
                     activeBots.delete(sessionId);
                 }
             } else if (connection === 'open') {
-                console.log(chalk.green(`[${BOT_TAG}] [${sessionId}] Connected Successfully!`));
+                console.log(chalk.green.bold(`[${BOT_TAG}] [${sessionId}] Connected Successfully!`));
                 activeBots.set(sessionId, sock);
             }
         });
 
-        // Message Handling (Basic Commands)
+        // Message Handling
         sock.ev.on('messages.upsert', async ({ messages, type }) => {
             if (type !== 'notify') return;
             const msg = messages[0];
@@ -93,18 +95,50 @@ async function startSingleBot(sessionId, phoneNumber = null, res = null) {
 
             const from = msg.key.remoteJid;
             let body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-            const prefix = '.';
 
-            if (!body.startsWith(prefix)) return;
+            if (!body.startsWith(PREFIX)) return;
 
-            const [cmd, ...args] = body.slice(prefix.length).trim().split(/ +/);
+            const [cmd, ...args] = body.slice(PREFIX.length).trim().split(/ +/);
+            const command = cmd.toLowerCase();
 
-            if (cmd === 'ping') {
-                await sock.sendMessage(from, { text: `📍 *${BOT_TAG} is Online!* (Session: ${sessionId})` }, { quoted: msg });
-            } else if (cmd === 'alive') {
-                await sock.sendMessage(from, {
-                    text: `*👋 DARK-DINU MD Multi-Bot Active!*\n⚡ Running smoothly on MongoDB.`
-                }, { quoted: msg });
+            switch (command) {
+                case 'ping': {
+                    const start = Date.now();
+                    const latency = Date.now() - start;
+                    const pingText = `*Pong!* 🏓\n` +
+                                     `⚡ *Speed:* ${latency}ms\n` +
+                                     `🤖 *Bot:* ${BOT_TAG}\n` +
+                                     `📁 *Session:* ${sessionId}`;
+                    await sock.sendMessage(from, { text: pingText }, { quoted: msg });
+                    break;
+                }
+
+                case 'alive': {
+                    const aliveText = `╭━━━〔 *${BOT_TAG}* 〕━━━╮\n` +
+                                      `┃ ⚡ Status: *Active & Online*\n` +
+                                      `┃ ⚙️ Prefix: *${PREFIX}*\n` +
+                                      `┃ 🗄️ Database: *MongoDB Atlas*\n` +
+                                      `┃ 🚀 Multi-Client: *Enabled*\n` +
+                                      `╰━━━━━━━━━━━━━━━━━━╯`;
+                    await sock.sendMessage(from, { text: aliveText }, { quoted: msg });
+                    break;
+                }
+
+                case 'menu': {
+                    const menuText = `╭━━━〔 *${BOT_TAG} MENU* 〕━━━╮\n` +
+                                     `┃\n` +
+                                     `┃ 📌 *Commands:*\n` +
+                                     `┃ 🔹 ${PREFIX}ping\n` +
+                                     `┃ 🔹 ${PREFIX}alive\n` +
+                                     `┃ 🔹 ${PREFIX}menu\n` +
+                                     `┃\n` +
+                                     `╰━━━━━━━━━━━━━━━━━━━╯`;
+                    await sock.sendMessage(from, { text: menuText }, { quoted: msg });
+                    break;
+                }
+
+                default:
+                    break;
             }
         });
 
@@ -123,11 +157,11 @@ async function startSingleBot(sessionId, phoneNumber = null, res = null) {
 async function autoReconnectAllBots() {
     console.log(chalk.cyan(`[${BOT_TAG}] Searching saved sessions in MongoDB...`));
     const distinctSessions = await SessionModel.distinct('sessionId');
-    console.log(chalk.green(`[${BOT_TAG}] Found ${distinctSessions.length} sessions. Starting them up...`));
+    console.log(chalk.green(`[${BOT_TAG}] Found ${distinctSessions.length} active sessions. Reconnecting...`));
 
     for (const sessionId of distinctSessions) {
         startSingleBot(sessionId);
-        await delay(3000); // Server overload නොවීමට delay එකක්
+        await delay(3000); // MongoDB හා WhatsApp servers overload නොවීමට delay එකක්
     }
 }
 
@@ -145,7 +179,7 @@ app.get('/pair', async (req, res) => {
     await startSingleBot(sessionId, number, res);
 });
 
-// දැනට Run වෙන Bots ගණන බැලීමට
+// දැනට Run වෙන Bots ගණන බැලීමට API එක
 app.get('/status', (req, res) => {
     res.json({
         botName: BOT_TAG,
@@ -163,11 +197,11 @@ mongoose.connect(MONGO_URL)
     .then(async () => {
         console.log(chalk.green(`[${BOT_TAG}] MongoDB Connected Successfully!`));
         
-        // කලින් තිබූ සියලුම bots auto start කරන්න
+        // කලින් තිබූ සියලුම bots auto start කිරීම
         await autoReconnectAllBots();
 
         app.listen(PORT, () => {
-            console.log(chalk.blue(`[${BOT_TAG}] Server is running on port: ${PORT}`));
+            console.log(chalk.blue(`[${BOT_TAG}] Web Server is running on port: ${PORT}`));
         });
     })
     .catch((err) => {
