@@ -1,24 +1,17 @@
 {
-  "name": "dark-dinu-md",
+  "name": "dark-dinu-multibot",
   "version": "2.0.0",
-  "description": "DARK-DINU WhatsApp Multi-Device User Bot",
+  "description": "DARK-DINU Multi-Client WhatsApp Bot with MongoDB",
   "main": "index.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "dark-dinu",
-    "whatsapp-bot",
-    "baileys-md"
-  ],
-  "author": "DARK-DINU",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.24",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.7",
-    "pino": "^9.6.0",
-    "qrcode-terminal": "^0.12.0"
+    "express": "^4.19.2",
+    "mongoose": "^8.3.1",
+    "pino": "^9.6.0"
   }
 }
